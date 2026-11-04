@@ -29,7 +29,7 @@ export function FeeComparer() {
                 <div className="text-xs text-muted">{r.network}</div>
               </td>
               <td className="py-3 font-mono">{r.feeNative}</td>
-              <td className="py-3 font-mono">${r.feeUsd.toFixed(2)}</td>
+              <td className="py-3 font-mono">{r.feeUsd < 0.01 ? "<$0.01" : `$${r.feeUsd.toFixed(2)}`}</td>
               <td className="py-3 text-muted">{r.minutes} min</td>
             </tr>
           ))}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { enabledCurrencies } from "@/lib/orders";
 import { productAvailable, productById } from "@/lib/products";
 import { BundleCheckout } from "./BundleCheckout";
+import { REPO } from "@/lib/site";
 
 export const metadata: Metadata = { title: "Storefront bundle" };
 export const dynamic = "force-dynamic";
@@ -30,7 +31,22 @@ export default function BuyPage() {
         </p>
       </div>
       {available ? (
-        <BundleCheckout product={p.id} priceUsd={p.priceUsd} currencies={enabledCurrencies()} />
+        <div className="space-y-6">
+          <BundleCheckout product={p.id} priceUsd={p.priceUsd} currencies={enabledCurrencies()} />
+          <div className="rounded-lg border border-border p-4 text-sm text-muted">
+            <p className="font-medium text-foreground">After you pay</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5">
+              <li>A download link appears on this page (USDT about a minute after sending; BTC and LTC after 1 confirmation).</li>
+              <li>The zip contains the full source, a setup guide and a changelog. Current version: 1.1.1.</li>
+              <li>Updates for a year arrive at the same link.</li>
+            </ol>
+            <p className="mt-3">
+              Not sure yet? The payment core is the same as the{" "}
+              <a href={REPO} className="text-accent hover:underline">free MIT version</a>, with 72 tests, and you can try a{" "}
+              <a href="/demo" className="text-accent hover:underline">$1 order</a> first.
+            </p>
+          </div>
+        </div>
       ) : (
         <div className="rounded-lg border border-border bg-panel p-6 text-sm text-muted">
           The bundle is being packaged; checkout opens here within days. The free core is already on GitHub.
