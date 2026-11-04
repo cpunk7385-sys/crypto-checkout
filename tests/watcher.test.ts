@@ -197,3 +197,32 @@ describe("resilience", () => {
     expect(app.getOrder(broken.id)?.status).toBe("pending");
   });
 });
+
+describe("late USDT payments", () => {
+  const minTimestamp = (url: string) => Number(new URL(url).searchParams.get("min_timestamp"));
+
+  it("keeps watching with no pending orders, so a payment after expiry is still recorded", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T00:00:00Z"));
+    const app = await setup();
+    const o = await app.createOrder(demo, "USDT");
+    vi.setSystemTime(new Date("2026-11-05T02:00:00Z"));
+    const calls = mockFetch([tron([transfer("late", o.amount_units, Date.now())])]);
+    await app.pollOnce();
+    expect(app.getOrder(o.id)?.status).toBe("expired");
+    expect(calls.some((c) => c.url.includes("api.trongrid.io"))).toBe(true);
+    expect(app.isTxProcessed("late")).toBe(true);
+  });
+
+  it("resumes from the newest transfer seen", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T12:00:00Z"));
+    const app = await setup();
+    const seenAt = Date.parse("2026-11-05T11:30:00Z");
+    mockFetch([tron([transfer("stray", 3_000_000, seenAt)])]);
+    await app.pollOnce();
+    const calls = mockFetch([tron([])]);
+    await app.pollOnce();
+    expect(minTimestamp(calls[0].url)).toBe(seenAt - 10 * 60_000);
+  });
+});

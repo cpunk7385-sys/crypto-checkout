@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { enabledCurrencies, expireOrders, isTxProcessed, markPaid, pendingOrders, recordTx, usdtAddress, type Order } from "./orders";
+import { enabledCurrencies, expireOrders, getCounter, setCounter, isTxProcessed, markPaid, pendingOrders, recordTx, usdtAddress, type Order } from "./orders";
 import { fetchIncomingUsdt } from "./tron";
 import { receivedUnits, type Coin, type Currency } from "./chains";
 import { recordEvent } from "./stats";
@@ -29,11 +29,16 @@ async function paid(orderId: string, txId: string, currency: string) {
   await notify(o);
 }
 
+const USDT_WATERMARK = "usdt_seen_until";
+const FIRST_LOOKBACK_MS = 24 * 60 * 60_000;
+const OVERLAP_MS = 10 * 60_000;
+
 async function pollUsdt() {
   const pending = pendingOrders("USDT");
-  if (pending.length === 0) return;
-  const since = Math.min(...pending.map((o) => o.created_at)) - 5 * 60_000;
-  for (const t of await fetchIncomingUsdt(usdtAddress(), since)) {
+  const watermark = getCounter(USDT_WATERMARK) ?? Date.now() - FIRST_LOOKBACK_MS;
+  const since = Math.min(watermark - OVERLAP_MS, ...pending.map((o) => o.created_at - 5 * 60_000));
+  const transfers = await fetchIncomingUsdt(usdtAddress(), since);
+  for (const t of transfers) {
     if (isTxProcessed(t.transaction_id)) continue;
     const value = Number(t.value);
     const i = pending.findIndex((o) => o.amount_units === value && o.created_at - 5 * 60_000 <= t.block_timestamp);
@@ -45,6 +50,8 @@ async function pollUsdt() {
       console.log(`[pay] unmatched USDT transfer ${t.transaction_id} value=${value}`);
     }
   }
+  const newest = Math.max(watermark, ...transfers.map((t) => t.block_timestamp));
+  if (newest > watermark) setCounter(USDT_WATERMARK, newest);
 }
 
 async function pollCoin(coin: Coin) {

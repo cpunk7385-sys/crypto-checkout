@@ -34,6 +34,14 @@ export function enabledCurrencies(): Currency[] {
   return out;
 }
 
+export function getCounter(name: string): number | null {
+  return db.prepare<[string], { value: number }>("SELECT value FROM counters WHERE name = ?").get(name)?.value ?? null;
+}
+
+export function setCounter(name: string, value: number) {
+  db.prepare("INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = ?").run(name, value, value);
+}
+
 function nextIndex(name: string): number {
   return db.transaction(() => {
     const row = db.prepare<[string], { value: number }>("SELECT value FROM counters WHERE name = ?").get(name);

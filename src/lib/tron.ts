@@ -17,6 +17,7 @@ export async function fetchIncomingUsdt(address: string, minTimestamp: number): 
   url.searchParams.set("contract_address", USDT_CONTRACT);
   url.searchParams.set("min_timestamp", String(minTimestamp));
   url.searchParams.set("limit", "100");
+  url.searchParams.set("order_by", "block_timestamp,asc");
   const headers: Record<string, string> = {};
   if (process.env.TRONGRID_API_KEY) headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
   const res = await fetch(url, { headers, cache: "no-store" });
