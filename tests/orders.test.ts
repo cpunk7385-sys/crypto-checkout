@@ -104,3 +104,4 @@ describe("markPaid", () => {
     expect(app.markPaid(o.id, "tx-late")).toBeUndefined();
   });
 });
+

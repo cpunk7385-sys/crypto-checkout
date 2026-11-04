@@ -41,11 +41,19 @@ Downloadable files go in `$DATA_DIR/files/`. Then render `<Checkout product="ebo
 | `GET /api/products` | products and enabled currencies |
 | `POST /api/orders` `{product, currency}` | creates an order: amount, address, URI for a QR |
 | `GET /api/orders/:id` | status; `deliverable` once paid |
-| `POST /api/license/verify` `{key}` | `{valid}` |
+| `POST /api/license/verify` `{key, product?}` | `{valid}`; pass `product` to check the key was bought for that product |
 | `GET /api/download/:token` | file download (7 days, 20 downloads) |
-| `GET /api/stats?key=` | views, referrers, events, orders |
+| `GET /api/stats` (header `x-stats-key`, or `?key=`) | views, referrers, events, orders |
 
-Webhook: set `WEBHOOK_URL`; on payment the server POSTs `{event: "order.paid", order}` with `x-signature: hex(hmac-sha256(WEBHOOK_SECRET, body))`.
+Webhook: set `WEBHOOK_URL` and `WEBHOOK_SECRET` (unsigned webhooks are never sent). On payment the server POSTs `{event: "order.paid", order}` with headers `x-timestamp` (unix seconds) and `x-signature: hex(hmac-sha256(WEBHOOK_SECRET, timestamp + "." + body))`. Reject requests whose timestamp is more than a few minutes old to stop replays:
+
+```ts
+const expected = createHmac("sha256", secret).update(`${req.headers["x-timestamp"]}.${rawBody}`).digest("hex");
+const fresh = Math.abs(Date.now() / 1000 - Number(req.headers["x-timestamp"])) < 300;
+const ok = fresh && timingSafeEqual(Buffer.from(expected), Buffer.from(req.headers["x-signature"]));
+```
+
+Abuse limits built in: 10 orders per IP per 10 minutes, 20 address-tool lookups per IP per minute (cached 5 minutes, and on their own `TOOLS_TRONGRID_API_KEY` so they can't exhaust the key payment detection uses), and a daily cap on analytics rows.
 
 ## Deploy
 

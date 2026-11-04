@@ -9,10 +9,17 @@ const MAX_BACKOFF_MS = 5 * 60_000;
 
 async function notify(order: Order) {
   const url = process.env.WEBHOOK_URL;
+  const secret = process.env.WEBHOOK_SECRET;
   if (!url) return;
+  if (!secret) {
+    console.error("[pay] WEBHOOK_URL is set without WEBHOOK_SECRET; not sending an unsigned webhook");
+    return;
+  }
   const body = JSON.stringify({ event: "order.paid", order: { id: order.id, product: order.product, currency: order.currency, amount_units: order.amount_units, tx_id: order.tx_id, paid_at: order.paid_at } });
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (process.env.WEBHOOK_SECRET) headers["x-signature"] = createHmac("sha256", process.env.WEBHOOK_SECRET).update(body).digest("hex");
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  headers["x-timestamp"] = timestamp;
+  headers["x-signature"] = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex");
   try {
     const r = await fetch(url, { method: "POST", headers, body });
     if (!r.ok) console.error(`[pay] webhook ${r.status} for order ${order.id}`);
@@ -117,7 +124,18 @@ export function startWatcher() {
     console.warn("[pay] no currencies configured (USDT_ADDRESS / BTC_XPUB / LTC_XPUB); watcher disabled");
     return;
   }
-  const tick = () => pollOnce().catch((e) => console.error("[pay] poll failed:", e));
+  let running = false;
+  const tick = async () => {
+    if (running) return;
+    running = true;
+    try {
+      await pollOnce();
+    } catch (e) {
+      console.error("[pay] poll failed:", e);
+    } finally {
+      running = false;
+    }
+  };
   g.__checkoutWatcher = setInterval(tick, POLL_MS);
   tick();
   console.log(`[pay] watching ${enabled.join(", ")} every ${POLL_MS / 1000}s`);

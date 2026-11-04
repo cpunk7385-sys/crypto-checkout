@@ -18,6 +18,14 @@ describe("license keys", () => {
     expect(app.isLicenseValid("RD-AAAA-BBBB-CCCC-DDDD")).toBe(false);
   });
 
+  it("scopes a key to the product it was bought for when a product is given", async () => {
+    const app = await freshApp();
+    const o = await app.createOrder(app.productById("demo")!, "USDT");
+    const key = app.markPaid(o.id, "tx-1")!.deliverable!;
+    expect(app.isLicenseValid(key, "demo")).toBe(true);
+    expect(app.isLicenseValid(key, "storefront")).toBe(false);
+  });
+
   it("rejects malformed keys without touching the database", async () => {
     const app = await freshApp();
     for (const k of ["", "cc-aaaa-bbbb-cccc-dddd", "CC-AAAA-BBBB-CCCC", "CC-AAAA-BBBB-CCCC-DDDD' OR 1=1--", "CC-0000-1111-OOOO-IIII"]) {

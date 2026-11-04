@@ -2,11 +2,19 @@ import { db } from "./sqlite";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+const MAX_ROWS_PER_DAY = 2_000;
+
 export function recordHit(path: string, referrer: string, newSession: boolean) {
+  const day = today();
+  const exists = db.prepare("SELECT 1 FROM hits WHERE day = ? AND path = ? AND referrer = ?").get(day, path.slice(0, 120), referrer.slice(0, 80));
+  if (!exists) {
+    const { n } = db.prepare<[string], { n: number }>("SELECT COUNT(*) n FROM hits WHERE day = ?").get(day)!;
+    if (n >= MAX_ROWS_PER_DAY) return;
+  }
   db.prepare(
     `INSERT INTO hits (day, path, referrer, views, sessions) VALUES (?, ?, ?, 1, ?)
      ON CONFLICT(day, path, referrer) DO UPDATE SET views = views + 1, sessions = sessions + excluded.sessions`,
-  ).run(today(), path.slice(0, 120), referrer.slice(0, 80), newSession ? 1 : 0);
+  ).run(day, path.slice(0, 120), referrer.slice(0, 80), newSession ? 1 : 0);
 }
 
 export function recordEvent(name: string, label = "") {

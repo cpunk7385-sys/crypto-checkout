@@ -4,6 +4,9 @@ import type { Currency } from "@/lib/chains";
 import { productAvailable, productById } from "@/lib/products";
 import { recordEvent } from "@/lib/stats";
 import { orderView } from "@/lib/order-view";
+import { clientIp, rateLimiter } from "@/lib/guard";
+
+const allow = rateLimiter(10, 10 * 60_000);
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +15,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!allow(clientIp(req))) return NextResponse.json({ error: "Too many orders from this address; try again in a few minutes." }, { status: 429 });
   const body = (await req.json().catch(() => ({}))) as { product?: string; currency?: string };
   const product = productById(body.product ?? "");
   if (!product || !productAvailable(product)) return NextResponse.json({ error: "unknown product" }, { status: 400 });

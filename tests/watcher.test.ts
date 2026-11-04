@@ -110,9 +110,19 @@ describe("USDT matching", () => {
     await app.pollOnce();
     const hook = calls.find((c) => c.url === "https://shop.example/hook")!;
     const body = hook.init!.body as string;
-    const sig = (hook.init!.headers as Record<string, string>)["x-signature"];
+    const headers = hook.init!.headers as Record<string, string>;
     expect(JSON.parse(body)).toMatchObject({ event: "order.paid", order: { id: o.id, tx_id: "t1" } });
-    expect(sig).toBe(createHmac("sha256", "s3cret").update(body).digest("hex"));
+    expect(Math.abs(Number(headers["x-timestamp"]) - Date.now() / 1000)).toBeLessThan(5);
+    expect(headers["x-signature"]).toBe(createHmac("sha256", "s3cret").update(`${headers["x-timestamp"]}.${body}`).digest("hex"));
+  });
+
+  it("refuses to send an unsigned webhook", async () => {
+    const app = await setup({ WEBHOOK_URL: "https://shop.example/hook", WEBHOOK_SECRET: "" });
+    const o = await app.createOrder(demo, "USDT");
+    const calls = mockFetch([tron([transfer("t1", o.amount_units, o.created_at + 1000)])]);
+    await app.pollOnce();
+    expect(app.getOrder(o.id)?.status).toBe("paid");
+    expect(calls.some((c) => c.url.includes("shop.example"))).toBe(false);
   });
 });
 

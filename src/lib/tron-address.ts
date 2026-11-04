@@ -49,7 +49,7 @@ export async function inspectTronAddress(addr: string): Promise<TronAddressInfo>
   const v = validateTronAddress(addr);
   if (!v.ok) return { address: addr, valid: false, reason: v.reason };
   const headers: Record<string, string> = { accept: "application/json" };
-  if (process.env.TRONGRID_API_KEY) headers["TRON-PRO-API-KEY"] = process.env.TRONGRID_API_KEY;
+  if (process.env.TOOLS_TRONGRID_API_KEY) headers["TRON-PRO-API-KEY"] = process.env.TOOLS_TRONGRID_API_KEY;
   const r = await fetch(`https://api.trongrid.io/v1/accounts/${addr}`, { headers, cache: "no-store" });
   if (!r.ok) throw new Error(`trongrid ${r.status}`);
   const j = (await r.json()) as { data?: { balance?: number; create_time?: number; trc20?: Record<string, string>[] }[] };

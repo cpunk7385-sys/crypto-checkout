@@ -55,7 +55,12 @@ function nextIndex(name: string): number {
 function uniqueUsdtAmount(priceUsd: number): number {
   const base = Math.round(priceUsd * 1_000_000);
   const taken = new Set(
-    db.prepare<[], { amount_units: number }>("SELECT amount_units FROM orders WHERE status = 'pending' AND currency = 'USDT'").all().map((r) => r.amount_units),
+    db
+      .prepare<[number], { amount_units: number }>(
+        "SELECT amount_units FROM orders WHERE currency = 'USDT' AND (status = 'pending' OR (status = 'expired' AND expires_at > ?))",
+      )
+      .all(Date.now() - 24 * 60 * 60_000)
+      .map((r) => r.amount_units),
   );
   for (let i = 0; i < 50; i++) {
     const candidate = base + randomInt(100, 10_000) * 100;

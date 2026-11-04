@@ -15,9 +15,10 @@ export function licenseKey(prefix = process.env.LICENSE_PREFIX ?? "CC"): string 
   return `${prefix}-${s}`;
 }
 
-export function isLicenseValid(key: string): boolean {
+export function isLicenseValid(key: string, product?: string): boolean {
   if (!KEY_RE.test(key)) return false;
-  return !!db.prepare("SELECT 1 FROM orders WHERE deliverable = ? AND status = 'paid'").get(key);
+  if (product === undefined) return !!db.prepare("SELECT 1 FROM orders WHERE deliverable = ? AND status = 'paid'").get(key);
+  return !!db.prepare("SELECT 1 FROM orders WHERE deliverable = ? AND status = 'paid' AND product = ?").get(key, product);
 }
 
 export function fulfill(orderId: string, product: string): string {
