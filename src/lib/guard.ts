@@ -21,7 +21,7 @@ export function rateLimiter(limit: number, windowMs: number) {
     if (!entry || entry.resetAt <= now) {
       if (hits.size >= MAX_KEYS) {
         for (const [k, v] of hits) if (v.resetAt <= now) hits.delete(k);
-        if (hits.size >= MAX_KEYS) return false;
+        if (hits.size >= MAX_KEYS) hits.delete(hits.keys().next().value!);
       }
       hits.set(key, { count: 1, resetAt: now + windowMs });
       return true;

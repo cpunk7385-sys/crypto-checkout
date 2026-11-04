@@ -28,8 +28,8 @@ async function notify(order: Order) {
   }
 }
 
-async function paid(orderId: string, txId: string, currency: string) {
-  const o = markPaid(orderId, txId);
+async function paid(orderId: string, txId: string, currency: string, alsoPaidBy: string[] = []) {
+  const o = markPaid(orderId, txId, alsoPaidBy);
   if (!o) return;
   recordEvent("paid", currency);
   console.log(`[pay] ${currency} order ${o.id} (${o.product}) paid by ${txId}`);
@@ -44,7 +44,7 @@ async function pollUsdt() {
   const pending = pendingOrders("USDT");
   const watermark = getCounter(USDT_WATERMARK) ?? Date.now() - FIRST_LOOKBACK_MS;
   const since = Math.min(watermark - OVERLAP_MS, ...pending.map((o) => o.created_at - 5 * 60_000));
-  const transfers = await fetchIncomingUsdt(usdtAddress(), since);
+  const { transfers, newest: newestSeen } = await fetchIncomingUsdt(usdtAddress(), since);
   for (const t of transfers) {
     if (isTxProcessed(t.transaction_id)) continue;
     const value = Number(t.value);
@@ -57,7 +57,7 @@ async function pollUsdt() {
       console.log(`[pay] unmatched USDT transfer ${t.transaction_id} value=${value}`);
     }
   }
-  const newest = Math.max(watermark, ...transfers.map((t) => t.block_timestamp));
+  const newest = Math.max(watermark, newestSeen);
   if (newest > watermark) setCounter(USDT_WATERMARK, newest);
 }
 
@@ -66,8 +66,8 @@ async function pollCoin(coin: Coin) {
   let failed = 0;
   for (const o of orders) {
     try {
-      const { confirmed, unconfirmed, txid } = await receivedUnits(coin, o.address);
-      if (confirmed >= o.min_units && txid) await paid(o.id, txid, coin);
+      const { confirmed, unconfirmed, txid, txids } = await receivedUnits(coin, o.address);
+      if (confirmed >= o.min_units && txid) await paid(o.id, txid, coin, txids);
       else if (confirmed + unconfirmed >= o.min_units && !o.seen_at) markSeen(o.id);
     } catch (e) {
       failed++;

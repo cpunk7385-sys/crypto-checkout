@@ -93,8 +93,13 @@ export async function createOrder(product: Product, currency: Currency): Promise
 
 export const getOrder = (id: string) => db.prepare<[string], Order>("SELECT * FROM orders WHERE id = ?").get(id);
 
+const SEEN_PATIENCE_MS = 7 * 24 * 60 * 60_000;
+
 export function expireOrders() {
-  db.prepare("UPDATE orders SET status = 'expired' WHERE status = 'pending' AND expires_at < ?").run(Date.now());
+  const now = Date.now();
+  db.prepare(
+    "UPDATE orders SET status = 'expired' WHERE status = 'pending' AND expires_at < ? AND (seen_at IS NULL OR seen_at < ?)",
+  ).run(now, now - SEEN_PATIENCE_MS);
 }
 
 export function pendingOrders(currency?: Currency): Order[] {
@@ -109,13 +114,13 @@ export function recordTx(txId: string, orderId: string | null) {
   db.prepare("INSERT OR IGNORE INTO processed_txs (tx_id, order_id, seen_at) VALUES (?, ?, ?)").run(txId, orderId, Date.now());
 }
 
-export function markPaid(orderId: string, txId: string): Order | undefined {
+export function markPaid(orderId: string, txId: string, alsoPaidBy: string[] = []): Order | undefined {
   return db.transaction(() => {
     const o = getOrder(orderId);
     if (!o || o.status !== "pending") return undefined;
     const deliverable = fulfill(o.id, o.product);
     db.prepare("UPDATE orders SET status = 'paid', paid_at = ?, tx_id = ?, deliverable = ? WHERE id = ?").run(Date.now(), txId, deliverable, orderId);
-    recordTx(txId, orderId);
+    for (const t of new Set([txId, ...alsoPaidBy])) recordTx(t, orderId);
     return getOrder(orderId);
   })();
 }

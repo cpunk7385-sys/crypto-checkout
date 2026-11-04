@@ -17,6 +17,15 @@ describe("rateLimiter", () => {
   });
 });
 
+describe("rateLimiter when its table is full", () => {
+  it("evicts the oldest client instead of refusing everyone", async () => {
+    const allow = rateLimiter(1, 60_000);
+    for (let i = 0; i < 20_000; i++) allow(`ip-${i}`);
+    expect(allow("newcomer")).toBe(true);
+    expect(allow("ip-19999")).toBe(false);
+  });
+});
+
 describe("secretEquals", () => {
   it("matches only the exact configured secret", () => {
     expect(secretEquals("s3cret", "s3cret")).toBe(true);

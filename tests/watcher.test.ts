@@ -177,13 +177,42 @@ describe("coin matching", () => {
     expect(app.getOrder(o.id)?.deliverable).toBeNull();
   });
 
-  it("adds up partial payments to the same address", async () => {
+  it("adds up partial payments and records every paying transaction against the order", async () => {
     const app = await setup();
     const o = await coinOrder(app, "BTC");
     const half = Math.ceil(o.amount_units / 2);
-    mockFetch([explorer({ [o.address]: [{ txid: "p1", value: half }, { txid: "p2", value: half }] })]);
+    mockFetch([explorer({ [o.address]: [{ txid: "p2-newest", value: half }, { txid: "p1-oldest", value: half }] })]);
     await app.pollOnce();
     expect(app.getOrder(o.id)?.status).toBe("paid");
+    expect(app.isTxProcessed("p1-oldest")).toBe(true);
+    expect(app.isTxProcessed("p2-newest")).toBe(true);
+  });
+
+  it("keeps a seen payment's order alive for days if it is slow to confirm", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T00:00:00Z"));
+    const app = await setup();
+    const o = await coinOrder(app, "BTC");
+    mockFetch([explorer({ [o.address]: [{ txid: "slow", value: o.amount_units, confirmed: false }] })]);
+    await app.pollOnce();
+    vi.setSystemTime(new Date("2026-11-07T00:00:00Z"));
+    await app.pollOnce();
+    expect(app.getOrder(o.id)?.status).toBe("pending");
+    mockFetch([explorer({ [o.address]: [{ txid: "slow", value: o.amount_units, confirmed: true }] })]);
+    await app.pollOnce();
+    expect(app.getOrder(o.id)?.status).toBe("paid");
+  });
+
+  it("gives up on a seen payment that never confirms within a week", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T00:00:00Z"));
+    const app = await setup();
+    const o = await coinOrder(app, "LTC");
+    mockFetch([explorer({ [o.address]: [{ txid: "stuck", value: o.amount_units, confirmed: false }] })]);
+    await app.pollOnce();
+    vi.setSystemTime(new Date("2026-11-12T00:00:01Z"));
+    app.expireOrders();
+    expect(app.getOrder(o.id)?.status).toBe("expired");
   });
 });
 
@@ -234,6 +263,42 @@ describe("resilience", () => {
     await app.pollOnce();
     expect(app.getOrder(ok.id)?.status).toBe("paid");
     expect(app.getOrder(broken.id)?.status).toBe("pending");
+  });
+});
+
+describe("TronGrid paging", () => {
+  it("follows the fingerprint to later pages and ignores zero-value transfers", async () => {
+    const app = await setup();
+    const o = await app.createOrder(demo, "USDT");
+    const first = Array.from({ length: 100 }, (_, i) => transfer(`spam-${i}`, 0, o.created_at + i));
+    const calls = mockFetch([
+      {
+        match: (u) => u.includes("api.trongrid.io") && !u.includes("fingerprint="),
+        respond: () => json({ data: first, meta: { fingerprint: "next-page" }, success: true }),
+      },
+      {
+        match: (u) => u.includes("api.trongrid.io") && u.includes("fingerprint=next-page"),
+        respond: () => json({ data: [transfer("real", o.amount_units, o.created_at + 500)], meta: {}, success: true }),
+      },
+    ]);
+    await app.pollOnce();
+    expect(calls.filter((c) => c.url.includes("api.trongrid.io"))).toHaveLength(2);
+    expect(app.getOrder(o.id)?.tx_id).toBe("real");
+    expect(app.isTxProcessed("spam-0")).toBe(false);
+  });
+});
+
+describe("USDT spam", () => {
+  it("advances the watermark past zero-value spam so it is not re-read every poll", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T12:00:00Z"));
+    const app = await setup();
+    const spamAt = Date.parse("2026-11-05T11:40:00Z");
+    mockFetch([tron([transfer("spam", 0, spamAt)])]);
+    await app.pollOnce();
+    const calls = mockFetch([tron([])]);
+    await app.pollOnce();
+    expect(Number(new URL(calls[0].url).searchParams.get("min_timestamp"))).toBe(spamAt - 10 * 60_000);
   });
 });
 
