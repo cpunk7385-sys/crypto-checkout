@@ -7,7 +7,7 @@ Live demo with a real $1 order: **https://cryptocheckout.duckdns.org/demo**
 ## How it works
 
 - **USDT on TRON**: every order gets a unique amount (`12.0371`). The watcher polls TronGrid for transfers to your address and matches the order by amount. One address, no key.
-- **BTC / LTC**: every order gets its own bech32 address derived from your BIP84 account xpub. mempool.space / litecoinspace.org are polled; the order is paid on first sight (unconfirmed counts) with a 1.5% tolerance for wallet rounding.
+- **BTC / LTC**: every order gets its own bech32 address derived from your BIP84 account xpub. mempool.space / litecoinspace.org are polled; the order is delivered once 1 confirmation covers the amount (1.5% tolerance for wallet rounding). A payment seen unconfirmed marks the order *seen* and extends its expiry by 24 h so it can't expire while confirming. Zero-confirmation delivery was dropped: with full-RBF the default in Bitcoin Core, an unconfirmed payment can be replaced for a few cents after the goods are out.
 - **Delivery**: a license key, an expiring download link, a text, or a signed webhook to your own backend. Orders live in SQLite.
 
 Prices are locked at order time from CoinGecko; orders expire after 60 minutes.
@@ -62,7 +62,7 @@ The core above is complete for a single product. The paid bundle adds a multi-pr
 
 ## Limits, honestly
 
-- Unconfirmed BTC/LTC counts as paid: right for digital goods under ~$50, wrong for anything you can't claw back.
+- BTC/LTC need 1 confirmation before delivery (about 10 minutes for BTC, 2–3 for LTC). Buyers see "payment seen" in the meantime.
 - USDT matching by amount needs the buyer to send exactly; exchanges that deduct fees from the amount break it (the page says so). Unmatched transfers are logged for manual handling.
 - No refunds flow: crypto has no chargebacks; you refund by sending from your wallet.
 - Tether can freeze USDT addresses; keep operating balances small.

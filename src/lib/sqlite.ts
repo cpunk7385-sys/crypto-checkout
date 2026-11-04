@@ -49,6 +49,8 @@ function open() {
       PRIMARY KEY (day, name, label)
     );
   `);
+  const cols = new Set(db.prepare<[], { name: string }>("PRAGMA table_info(orders)").all().map((c) => c.name));
+  if (!cols.has("seen_at")) db.exec("ALTER TABLE orders ADD COLUMN seen_at INTEGER");
   return db;
 }
 

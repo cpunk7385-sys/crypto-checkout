@@ -50,19 +50,25 @@ async function addressTxs(c: Coin, address: string): Promise<EsploraTx[]> {
   throw lastError;
 }
 
-export async function receivedUnits(c: Coin, address: string): Promise<{ units: number; txid: string | null }> {
+export type Received = { confirmed: number; unconfirmed: number; txid: string | null };
+
+export async function receivedUnits(c: Coin, address: string): Promise<Received> {
   const txs = await addressTxs(c, address);
-  let units = 0;
+  let confirmed = 0;
+  let unconfirmed = 0;
   let txid: string | null = null;
   for (const tx of txs) {
     for (const o of tx.vout) {
-      if (o.scriptpubkey_address === address) {
-        units += o.value;
+      if (o.scriptpubkey_address !== address) continue;
+      if (tx.status.confirmed) {
+        confirmed += o.value;
         txid ??= tx.txid;
+      } else {
+        unconfirmed += o.value;
       }
     }
   }
-  return { units, txid };
+  return { confirmed, unconfirmed, txid };
 }
 
 export function formatUnits(units: number, decimals: number): string {

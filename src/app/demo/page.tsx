@@ -20,7 +20,7 @@ export default function DemoPage() {
         <ol className="mt-5 list-decimal space-y-2 pl-5 text-sm text-muted">
           <li>USDT: send the exact unique amount to the shared address. Matched by amount within 60 minutes.</li>
           <li>BTC / LTC: a fresh address is derived from the xpub for this order. Any amount above the minimum counts.</li>
-          <li>The watcher polls every 20 seconds; unconfirmed transactions already count.</li>
+          <li>The watcher polls every 20 seconds. USDT counts once TRON confirms it (about a minute); BTC and LTC are delivered after 1 confirmation, and the page shows when the payment has been seen.</li>
         </ol>
       </div>
       <Checkout product={p.id} priceUsd={p.priceUsd} currencies={enabledCurrencies()} />

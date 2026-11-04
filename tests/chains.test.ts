@@ -33,7 +33,7 @@ describe("deriveAddress", () => {
 describe("receivedUnits", () => {
   const ADDR = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu";
 
-  it("sums every output paying the address across transactions and reports the first txid", async () => {
+  it("separates confirmed from unconfirmed value and reports the first confirming txid", async () => {
     const { receivedUnits } = await chains({});
     mockFetch([
       {
@@ -45,13 +45,13 @@ describe("receivedUnits", () => {
           ]),
       },
     ]);
-    await expect(receivedUnits("BTC", ADDR)).resolves.toEqual({ units: 12_500, txid: "aa" });
+    await expect(receivedUnits("BTC", ADDR)).resolves.toEqual({ confirmed: 2_500, unconfirmed: 10_000, txid: "bb" });
   });
 
   it("reports nothing for an unused address", async () => {
     const { receivedUnits } = await chains({});
     mockFetch([{ match: () => true, respond: () => json([]) }]);
-    await expect(receivedUnits("BTC", ADDR)).resolves.toEqual({ units: 0, txid: null });
+    await expect(receivedUnits("BTC", ADDR)).resolves.toEqual({ confirmed: 0, unconfirmed: 0, txid: null });
   });
 
   it("throws when the explorer answers with an error status", async () => {
@@ -69,7 +69,7 @@ describe("receivedUnits", () => {
         respond: () => json([{ txid: "cc", status: { confirmed: true }, vout: [{ scriptpubkey_address: ADDR, value: 777 }] }]),
       },
     ]);
-    await expect(receivedUnits("BTC", ADDR)).resolves.toEqual({ units: 777, txid: "cc" });
+    await expect(receivedUnits("BTC", ADDR)).resolves.toEqual({ confirmed: 777, unconfirmed: 0, txid: "cc" });
   });
 
   it("reports the last explorer's error when every Bitcoin explorer fails", async () => {

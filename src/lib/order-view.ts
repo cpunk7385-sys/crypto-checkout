@@ -15,6 +15,7 @@ export function orderView(o: Order) {
     address: o.address,
     uri,
     status: o.status,
+    seen: o.seen_at !== null,
     expiresAt: o.expires_at,
     deliverable: o.status === "paid" ? o.deliverable : null,
   };

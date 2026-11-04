@@ -19,6 +19,7 @@ export type Order = {
   paid_at: number | null;
   tx_id: string | null;
   deliverable: string | null;
+  seen_at: number | null;
 };
 
 const ORDER_TTL_MS = Number(process.env.ORDER_TTL_MINUTES ?? 60) * 60_000;
@@ -66,7 +67,7 @@ function uniqueUsdtAmount(priceUsd: number): number {
 export async function createOrder(product: Product, currency: Currency): Promise<Order> {
   if (!enabledCurrencies().includes(currency)) throw new Error(`${currency} not available`);
   const now = Date.now();
-  const base = { id: randomBytes(8).toString("hex"), product: product.id, status: "pending" as const, created_at: now, expires_at: now + ORDER_TTL_MS, paid_at: null, tx_id: null, deliverable: null };
+  const base = { id: randomBytes(8).toString("hex"), product: product.id, status: "pending" as const, created_at: now, expires_at: now + ORDER_TTL_MS, paid_at: null, tx_id: null, deliverable: null, seen_at: null };
   let order: Order;
   if (currency === "USDT") {
     const units = uniqueUsdtAmount(product.priceUsd);
@@ -112,4 +113,13 @@ export function markPaid(orderId: string, txId: string): Order | undefined {
     recordTx(txId, orderId);
     return getOrder(orderId);
   })();
+}
+
+const CONFIRMATION_GRACE_MS = 24 * 60 * 60_000;
+
+export function markSeen(orderId: string) {
+  const now = Date.now();
+  db.prepare(
+    "UPDATE orders SET seen_at = ?, expires_at = MAX(expires_at, ?) WHERE id = ? AND status = 'pending' AND seen_at IS NULL",
+  ).run(now, now + CONFIRMATION_GRACE_MS, orderId);
 }

@@ -23,12 +23,12 @@ const tron = (transfers: unknown[] | (() => Response)) => ({
   respond: () => (typeof transfers === "function" ? transfers() : json({ data: transfers, success: true })),
 });
 
-const explorer = (byAddress: Record<string, { txid: string; value: number }[]> | (() => Response)) => ({
+const explorer = (byAddress: Record<string, { txid: string; value: number; confirmed?: boolean }[]> | (() => Response)) => ({
   match: (u: string) => u.includes("/address/") && u.endsWith("/txs"),
   respond: (u: string) => {
     if (typeof byAddress === "function") return byAddress();
     const addr = u.split("/address/")[1].replace("/txs", "");
-    return json((byAddress[addr] ?? []).map((t) => ({ txid: t.txid, status: { confirmed: false }, vout: [{ scriptpubkey_address: addr, value: t.value }] })));
+    return json((byAddress[addr] ?? []).map((t) => ({ txid: t.txid, status: { confirmed: t.confirmed ?? true }, vout: [{ scriptpubkey_address: addr, value: t.value }] })));
   },
 });
 
@@ -122,7 +122,7 @@ describe("coin matching", () => {
     return app.createOrder(demo, currency);
   }
 
-  it("pays a coin order once 98.5% of the amount reaches its address", async () => {
+  it("pays a coin order once 98.5% of the amount is confirmed at its address", async () => {
     const app = await setup();
     const o = await coinOrder(app, "BTC");
     mockFetch([explorer({ [o.address]: [{ txid: "b1", value: o.min_units }] })]);
@@ -136,6 +136,35 @@ describe("coin matching", () => {
     mockFetch([explorer({ [o.address]: [{ txid: "l1", value: o.min_units - 1 }] })]);
     await app.pollOnce();
     expect(app.getOrder(o.id)?.status).toBe("pending");
+  });
+
+  it("does not deliver on an unconfirmed payment, but keeps the order alive until it confirms", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-05T00:00:00Z"));
+    const app = await setup();
+    const o = await coinOrder(app, "BTC");
+    mockFetch([explorer({ [o.address]: [{ txid: "rbf", value: o.amount_units, confirmed: false }] })]);
+    await app.pollOnce();
+    const seen = app.getOrder(o.id)!;
+    expect(seen.status).toBe("pending");
+    expect(seen.deliverable).toBeNull();
+    expect(seen.seen_at).not.toBeNull();
+
+    vi.setSystemTime(new Date("2026-11-05T05:00:00Z"));
+    mockFetch([explorer({ [o.address]: [{ txid: "rbf", value: o.amount_units, confirmed: true }] })]);
+    await app.pollOnce();
+    expect(app.getOrder(o.id)?.status).toBe("paid");
+  });
+
+  it("does not deliver when a seen payment is replaced and never confirms", async () => {
+    const app = await setup();
+    const o = await coinOrder(app, "LTC");
+    mockFetch([explorer({ [o.address]: [{ txid: "x", value: o.amount_units, confirmed: false }] })]);
+    await app.pollOnce();
+    mockFetch([explorer({ [o.address]: [] })]);
+    await app.pollOnce();
+    expect(app.getOrder(o.id)?.status).toBe("pending");
+    expect(app.getOrder(o.id)?.deliverable).toBeNull();
   });
 
   it("adds up partial payments to the same address", async () => {

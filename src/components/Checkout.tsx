@@ -7,8 +7,8 @@ import type { OrderView } from "@/lib/order-view";
 
 const INFO: Record<Currency, { label: string; network: string; note: string }> = {
   USDT: { label: "USDT", network: "TRON (TRC-20)", note: "Send exactly this amount: it is unique to your order and is how the payment is recognised. Not ERC-20, not BEP-20." },
-  BTC: { label: "Bitcoin", network: "on-chain (bech32), not Lightning", note: "The address is unique to your order, so any amount at or above the minimum counts. Marked paid as soon as the transaction is seen." },
-  LTC: { label: "Litecoin", network: "on-chain (bech32)", note: "The address is unique to your order, so any amount at or above the minimum counts. Marked paid as soon as the transaction is seen." },
+  BTC: { label: "Bitcoin", network: "on-chain (bech32), not Lightning", note: "The address is unique to your order, so any amount at or above the minimum counts. Delivered after 1 confirmation (usually about 10 minutes)." },
+  LTC: { label: "Litecoin", network: "on-chain (bech32)", note: "The address is unique to your order, so any amount at or above the minimum counts. Delivered after 1 confirmation (usually 2–3 minutes)." },
 };
 
 export function Checkout({
@@ -42,7 +42,7 @@ export function Checkout({
         const r = await fetch(`/api/orders/${order.id}`, { cache: "no-store" });
         if (!r.ok) return;
         const o = (await r.json()) as OrderView;
-        if (o.status !== "pending") setOrder(o);
+        if (o.status !== order.status || o.seen !== order.seen) setOrder(o);
       } catch {}
     }, 5000);
     return () => clearInterval(t);
@@ -99,7 +99,11 @@ export function Checkout({
               <div className="text-xs uppercase tracking-wide text-muted">Address</div>
               <code className="block select-all break-all font-mono">{order.address}</code>
             </div>
-            <div className="text-xs text-muted">Waiting for the payment… this page updates itself. Order expires in {mm}:{ss}.</div>
+            {order.seen ? (
+              <div className="text-xs text-emerald-300">Payment seen. Waiting for 1 confirmation; this page updates itself and you can safely leave it open.</div>
+            ) : (
+              <div className="text-xs text-muted">Waiting for the payment… this page updates itself. Order expires in {mm}:{ss}.</div>
+            )}
           </div>
         </div>
       </div>

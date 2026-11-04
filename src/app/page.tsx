@@ -33,7 +33,7 @@ export default function Home() {
       <section className="grid gap-6 md:grid-cols-3">
         {[
           ["USDT on TRON", "Each order gets a unique amount (12.0371 USDT). TronGrid is polled for transfers to your address and the order is matched by amount. One address, no key."],
-          ["BTC and LTC", "Each order gets its own address derived from your account xpub. mempool.space and litecoinspace are polled; paid on first sight, with a 1.5% tolerance for wallet rounding."],
+          ["BTC and LTC", "Each order gets its own address derived from your account xpub. mempool.space and litecoinspace are polled; delivered after 1 confirmation, with a 1.5% tolerance for wallet rounding. A payment seen in the mempool keeps the order open until it confirms."],
           ["Delivery", "License keys, expiring download links, or a signed webhook to your backend. SQLite keeps orders; one Docker container runs everything."],
         ].map(([t, d]) => (
           <div key={t} className="rounded-lg border border-border p-5">

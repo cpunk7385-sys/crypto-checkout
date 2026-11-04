@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { enabledCurrencies, expireOrders, getCounter, setCounter, isTxProcessed, markPaid, pendingOrders, recordTx, usdtAddress, type Order } from "./orders";
+import { enabledCurrencies, expireOrders, getCounter, setCounter, isTxProcessed, markPaid, markSeen, pendingOrders, recordTx, usdtAddress, type Order } from "./orders";
 import { fetchIncomingUsdt } from "./tron";
 import { receivedUnits, type Coin, type Currency } from "./chains";
 import { recordEvent } from "./stats";
@@ -59,8 +59,9 @@ async function pollCoin(coin: Coin) {
   let failed = 0;
   for (const o of orders) {
     try {
-      const { units, txid } = await receivedUnits(coin, o.address);
-      if (units >= o.min_units && txid) await paid(o.id, txid, coin);
+      const { confirmed, unconfirmed, txid } = await receivedUnits(coin, o.address);
+      if (confirmed >= o.min_units && txid) await paid(o.id, txid, coin);
+      else if (confirmed + unconfirmed >= o.min_units && !o.seen_at) markSeen(o.id);
     } catch (e) {
       failed++;
       console.error(`[pay] ${coin} poll failed for ${o.id}:`, e);
