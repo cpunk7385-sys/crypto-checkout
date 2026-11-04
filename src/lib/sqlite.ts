@@ -49,30 +49,7 @@ function open() {
       PRIMARY KEY (day, name, label)
     );
   `);
-  migrate(db);
   return db;
-}
-
-const ORDER_COLUMNS: [string, string][] = [
-  ["product", "TEXT NOT NULL DEFAULT ''"],
-  ["currency", "TEXT NOT NULL DEFAULT 'USDT'"],
-  ["address", "TEXT NOT NULL DEFAULT ''"],
-  ["min_units", "INTEGER NOT NULL DEFAULT 0"],
-  ["addr_index", "INTEGER"],
-  ["paid_at", "INTEGER"],
-  ["tx_id", "TEXT"],
-  ["deliverable", "TEXT"],
-];
-
-function migrate(db: Database.Database) {
-  const cols = new Set(
-    db.prepare<[], { name: string }>("PRAGMA table_info(orders)").all().map((c) => c.name),
-  );
-  for (const [name, ddl] of ORDER_COLUMNS) {
-    if (!cols.has(name)) db.exec(`ALTER TABLE orders ADD COLUMN ${name} ${ddl}`);
-  }
-  // a min_units of 0 would accept any amount, so never leave the column at its default
-  db.exec("UPDATE orders SET min_units = amount_units WHERE min_units = 0");
 }
 
 const g = globalThis as unknown as { __checkoutDb?: Database.Database };
