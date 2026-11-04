@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { PRODUCTS, publicProduct } from "@/lib/products";
-import { enabledCurrencies } from "@/lib/db";
+import { enabledCurrencies } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 

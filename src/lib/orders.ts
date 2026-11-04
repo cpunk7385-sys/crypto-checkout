@@ -1,10 +1,9 @@
-import Database from "better-sqlite3";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
 import { randomBytes, randomInt } from "node:crypto";
 import { COIN_DECIMALS, coinEnabled, deriveAddress, type Coin, type Currency } from "./chains";
+import { fulfill } from "./deliverables";
 import { coinUsdPrice } from "./prices";
-import { productById, type Product } from "./products";
+import { db } from "./sqlite";
+import type { Product } from "./products";
 
 export type Order = {
   id: string;
@@ -25,44 +24,6 @@ export type Order = {
 const ORDER_TTL_MS = Number(process.env.ORDER_TTL_MINUTES ?? 60) * 60_000;
 const COIN_TOLERANCE = 0.985;
 
-function open() {
-  const dir = process.env.DATA_DIR ?? path.join(process.cwd(), "data");
-  mkdirSync(dir, { recursive: true });
-  const db = new Database(path.join(dir, "checkout.sqlite"));
-  db.pragma("journal_mode = WAL");
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS orders (
-      id TEXT PRIMARY KEY,
-      product TEXT NOT NULL,
-      currency TEXT NOT NULL,
-      address TEXT NOT NULL,
-      amount_units INTEGER NOT NULL,
-      min_units INTEGER NOT NULL,
-      addr_index INTEGER,
-      status TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL,
-      paid_at INTEGER,
-      tx_id TEXT,
-      deliverable TEXT
-    );
-    CREATE INDEX IF NOT EXISTS orders_pending ON orders(status, currency);
-    CREATE TABLE IF NOT EXISTS processed_txs (tx_id TEXT PRIMARY KEY, order_id TEXT, seen_at INTEGER NOT NULL);
-    CREATE TABLE IF NOT EXISTS counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
-    CREATE TABLE IF NOT EXISTS downloads (
-      token TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL,
-      file TEXT NOT NULL,
-      expires_at INTEGER NOT NULL,
-      count INTEGER NOT NULL DEFAULT 0
-    );
-  `);
-  return db;
-}
-
-const g = globalThis as unknown as { __checkoutDb?: Database.Database };
-export const db = (g.__checkoutDb ??= open());
-
 export const usdtAddress = () => process.env.USDT_ADDRESS ?? "";
 
 export function enabledCurrencies(): Currency[] {
@@ -71,17 +32,6 @@ export function enabledCurrencies(): Currency[] {
   if (coinEnabled("BTC")) out.push("BTC");
   if (coinEnabled("LTC")) out.push("LTC");
   return out;
-}
-
-const KEY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-export function licenseKey(prefix = process.env.LICENSE_PREFIX ?? "CC"): string {
-  const bytes = randomBytes(16);
-  let s = "";
-  for (let i = 0; i < 16; i++) {
-    if (i > 0 && i % 4 === 0) s += "-";
-    s += KEY_ALPHABET[bytes[i] % KEY_ALPHABET.length];
-  }
-  return `${prefix}-${s}`;
 }
 
 function nextIndex(name: string): number {
@@ -145,37 +95,13 @@ export function recordTx(txId: string, orderId: string | null) {
   db.prepare("INSERT OR IGNORE INTO processed_txs (tx_id, order_id, seen_at) VALUES (?, ?, ?)").run(txId, orderId, Date.now());
 }
 
-function fulfill(order: Order): string {
-  const p = productById(order.product);
-  const d = p?.deliver ?? { type: "license" as const };
-  if (d.type === "license") return licenseKey();
-  if (d.type === "text") return d.text;
-  const token = randomBytes(16).toString("hex");
-  db.prepare("INSERT INTO downloads (token, order_id, file, expires_at) VALUES (?, ?, ?, ?)").run(
-    token, order.id, d.file, Date.now() + 7 * 86_400_000,
-  );
-  return `/api/download/${token}`;
-}
-
 export function markPaid(orderId: string, txId: string): Order | undefined {
   return db.transaction(() => {
     const o = getOrder(orderId);
     if (!o || o.status !== "pending") return undefined;
-    const deliverable = fulfill(o);
+    const deliverable = fulfill(o.id, o.product);
     db.prepare("UPDATE orders SET status = 'paid', paid_at = ?, tx_id = ?, deliverable = ? WHERE id = ?").run(Date.now(), txId, deliverable, orderId);
     recordTx(txId, orderId);
     return getOrder(orderId);
   })();
-}
-
-export function isLicenseValid(key: string): boolean {
-  if (!/^[A-Z0-9]{1,8}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(key)) return false;
-  return !!db.prepare("SELECT 1 FROM orders WHERE deliverable = ? AND status = 'paid'").get(key);
-}
-
-export function takeDownload(token: string): { file: string } | null {
-  const row = db.prepare<[string], { file: string; expires_at: number; count: number }>("SELECT file, expires_at, count FROM downloads WHERE token = ?").get(token);
-  if (!row || row.expires_at < Date.now() || row.count >= 20) return null;
-  db.prepare("UPDATE downloads SET count = count + 1 WHERE token = ?").run(token);
-  return { file: row.file };
 }

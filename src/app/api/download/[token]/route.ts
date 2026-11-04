@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { takeDownload } from "@/lib/db";
+import { takeDownload } from "@/lib/deliverables";
 import { filesDir } from "@/lib/products";
 
 export const dynamic = "force-dynamic";

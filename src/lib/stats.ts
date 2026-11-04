@@ -1,22 +1,4 @@
-import { db } from "./db";
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS hits (
-    day TEXT NOT NULL,
-    path TEXT NOT NULL,
-    referrer TEXT NOT NULL DEFAULT '',
-    views INTEGER NOT NULL DEFAULT 0,
-    sessions INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (day, path, referrer)
-  );
-  CREATE TABLE IF NOT EXISTS events (
-    day TEXT NOT NULL,
-    name TEXT NOT NULL,
-    label TEXT NOT NULL DEFAULT '',
-    count INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (day, name, label)
-  );
-`);
+import { db } from "./sqlite";
 
 const today = () => new Date().toISOString().slice(0, 10);
 

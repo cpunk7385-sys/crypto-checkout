@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { expireOrders, getOrder } from "@/lib/db";
+import { expireOrders, getOrder } from "@/lib/orders";
 import { orderView } from "../../order-view";
 
 export const dynamic = "force-dynamic";

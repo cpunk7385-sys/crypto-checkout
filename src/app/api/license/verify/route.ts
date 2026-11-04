@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isLicenseValid } from "@/lib/db";
+import { isLicenseValid } from "@/lib/deliverables";
 
 export const dynamic = "force-dynamic";
 

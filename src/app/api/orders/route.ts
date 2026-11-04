@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createOrder, enabledCurrencies } from "@/lib/db";
+import { createOrder, enabledCurrencies } from "@/lib/orders";
 import type { Currency } from "@/lib/chains";
 import { productAvailable, productById } from "@/lib/products";
 import { recordEvent } from "@/lib/stats";

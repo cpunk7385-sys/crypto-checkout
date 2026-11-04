@@ -1,4 +1,4 @@
-import type { Order } from "@/lib/db";
+import type { Order } from "@/lib/orders";
 import { COIN_DECIMALS, coinUri, formatUnits } from "@/lib/chains";
 
 export function orderView(o: Order) {

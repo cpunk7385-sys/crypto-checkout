@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { enabledCurrencies } from "@/lib/db";
+import { enabledCurrencies } from "@/lib/orders";
 import { productAvailable, productById } from "@/lib/products";
 import { BundleCheckout } from "./BundleCheckout";
 
