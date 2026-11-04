@@ -1,0 +1,28 @@
+services:
+  web:
+    image: ghcr.io/cpunk7385-sys/crypto-checkout:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /data
+    volumes:
+      - cc_data:/data
+    expose:
+      - "3000"
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.cryptocheckout-web.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.cryptocheckout-web.entrypoints=websecure"
+      - "traefik.http.routers.cryptocheckout-web.tls.certresolver=le"
+      - "traefik.http.services.cryptocheckout-web.loadbalancer.server.port=3000"
+
+volumes:
+  cc_data:
+
+networks:
+  traefik-public:
+    external: true
