@@ -51,5 +51,11 @@ export function summary(days = 14) {
       "SELECT status, currency, COUNT(*) n FROM orders GROUP BY status, currency",
     )
     .all();
-  return { since, byDay, topPaths, referrers, events, orders };
+  const addressIndexes = Object.fromEntries(
+    db
+      .prepare<[], { name: string; value: number }>("SELECT name, value FROM counters WHERE name IN ('BTC', 'LTC')")
+      .all()
+      .map((r) => [r.name, r.value]),
+  );
+  return { since, byDay, topPaths, referrers, events, orders, addressIndexes };
 }
