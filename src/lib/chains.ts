@@ -7,8 +7,8 @@ export type Currency = "USDT" | Coin;
 const LTC_NET = { bech32: "ltc", pubKeyHash: 0x30, scriptHash: 0x32, wif: 0xb0 };
 
 const COINS = {
-  BTC: { xpubEnv: "BTC_XPUB", net: btc.NETWORK, api: "https://mempool.space/api", uri: "bitcoin", geckoId: "bitcoin" },
-  LTC: { xpubEnv: "LTC_XPUB", net: LTC_NET, api: "https://litecoinspace.org/api", uri: "litecoin", geckoId: "litecoin" },
+  BTC: { xpubEnv: "BTC_XPUB", net: btc.NETWORK, apis: ["https://mempool.space/api", "https://blockstream.info/api"], uri: "bitcoin", geckoId: "bitcoin" },
+  LTC: { xpubEnv: "LTC_XPUB", net: LTC_NET, apis: ["https://litecoinspace.org/api"], uri: "litecoin", geckoId: "litecoin" },
 } as const;
 
 export const COIN_DECIMALS = 8;
@@ -32,13 +32,26 @@ type EsploraTx = {
   status: { confirmed: boolean };
 };
 
+async function addressTxs(c: Coin, address: string): Promise<EsploraTx[]> {
+  let lastError: unknown;
+  for (const api of COINS[c].apis) {
+    try {
+      const res = await fetch(`${api}/address/${address}/txs`, {
+        headers: { accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) throw new Error(`${c} explorer ${res.status}`);
+      return (await res.json()) as EsploraTx[];
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  throw lastError;
+}
+
 export async function receivedUnits(c: Coin, address: string): Promise<{ units: number; txid: string | null }> {
-  const res = await fetch(`${COINS[c].api}/address/${address}/txs`, {
-    headers: { accept: "application/json" },
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`${c} explorer ${res.status}`);
-  const txs = (await res.json()) as EsploraTx[];
+  const txs = await addressTxs(c, address);
   let units = 0;
   let txid: string | null = null;
   for (const tx of txs) {

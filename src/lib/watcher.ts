@@ -36,9 +36,11 @@ async function pollUsdt() {
   for (const t of await fetchIncomingUsdt(usdtAddress(), since)) {
     if (isTxProcessed(t.transaction_id)) continue;
     const value = Number(t.value);
-    const match = pending.find((o) => o.amount_units === value && o.created_at - 5 * 60_000 <= t.block_timestamp);
-    if (match) await paid(match.id, t.transaction_id, "USDT");
-    else {
+    const i = pending.findIndex((o) => o.amount_units === value && o.created_at - 5 * 60_000 <= t.block_timestamp);
+    if (i >= 0) {
+      const [match] = pending.splice(i, 1);
+      await paid(match.id, t.transaction_id, "USDT");
+    } else {
       recordTx(t.transaction_id, null);
       console.log(`[pay] unmatched USDT transfer ${t.transaction_id} value=${value}`);
     }
