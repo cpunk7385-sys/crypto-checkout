@@ -1,10 +1,11 @@
 import { createHmac } from "node:crypto";
 import { enabledCurrencies, expireOrders, isTxProcessed, markPaid, pendingOrders, recordTx, usdtAddress, type Order } from "./orders";
 import { fetchIncomingUsdt } from "./tron";
-import { receivedUnits, type Coin } from "./chains";
+import { receivedUnits, type Coin, type Currency } from "./chains";
 import { recordEvent } from "./stats";
 
 const POLL_MS = Number(process.env.POLL_SECONDS ?? 20) * 1000;
+const MAX_BACKOFF_MS = 5 * 60_000;
 
 async function notify(order: Order) {
   const url = process.env.WEBHOOK_URL;
@@ -45,22 +46,56 @@ async function pollUsdt() {
 }
 
 async function pollCoin(coin: Coin) {
-  for (const o of pendingOrders(coin)) {
+  const orders = pendingOrders(coin);
+  let failed = 0;
+  for (const o of orders) {
     try {
       const { units, txid } = await receivedUnits(coin, o.address);
       if (units >= o.min_units && txid) await paid(o.id, txid, coin);
     } catch (e) {
+      failed++;
       console.error(`[pay] ${coin} poll failed for ${o.id}:`, e);
     }
   }
+  if (failed > 0 && failed === orders.length) {
+    throw new Error(`${coin} explorer unreachable for all ${failed} pending address(es)`);
+  }
+}
+
+type Source = { poll: () => Promise<void>; failures: number; nextAt: number };
+
+const sources = new Map<Currency, Source>();
+
+function sourceFor(currency: Currency): Source {
+  let source = sources.get(currency);
+  if (!source) {
+    const poll = currency === "USDT" ? pollUsdt : () => pollCoin(currency);
+    source = { poll, failures: 0, nextAt: 0 };
+    sources.set(currency, source);
+  }
+  return source;
 }
 
 export async function pollOnce() {
   expireOrders();
-  const enabled = enabledCurrencies();
-  if (enabled.includes("USDT")) await pollUsdt();
-  if (enabled.includes("BTC")) await pollCoin("BTC");
-  if (enabled.includes("LTC")) await pollCoin("LTC");
+  for (const currency of enabledCurrencies()) {
+    const source = sourceFor(currency);
+    if (source.nextAt > Date.now()) continue;
+    try {
+      await source.poll();
+      if (source.failures > 0) console.log(`[pay] ${currency} recovered after ${source.failures} failed polls`);
+      source.failures = 0;
+      source.nextAt = 0;
+    } catch (e) {
+      source.failures++;
+      const wait = Math.min(POLL_MS * 2 ** source.failures, MAX_BACKOFF_MS);
+      source.nextAt = Date.now() + wait;
+      console.error(
+        `[pay] ${currency} poll failed (${source.failures} in a row), retrying in ${Math.round(wait / 1000)}s:`,
+        e,
+      );
+    }
+  }
 }
 
 const g = globalThis as unknown as { __checkoutWatcher?: NodeJS.Timeout };
