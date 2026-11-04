@@ -1,5 +1,5 @@
-import type { Order } from "@/lib/orders";
-import { COIN_DECIMALS, coinUri, formatUnits } from "@/lib/chains";
+import type { Order } from "./orders";
+import { COIN_DECIMALS, coinUri, formatUnits } from "./chains";
 
 export function orderView(o: Order) {
   const decimals = o.currency === "USDT" ? 6 : COIN_DECIMALS;

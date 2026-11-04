@@ -3,7 +3,7 @@ import { createOrder, enabledCurrencies } from "@/lib/orders";
 import type { Currency } from "@/lib/chains";
 import { productAvailable, productById } from "@/lib/products";
 import { recordEvent } from "@/lib/stats";
-import { orderView } from "../order-view";
+import { orderView } from "@/lib/order-view";
 
 export const dynamic = "force-dynamic";
 
