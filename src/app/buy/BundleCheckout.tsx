@@ -1,8 +1,9 @@
 "use client";
 
+import type { Currency } from "@/lib/chains";
 import { Checkout } from "@/components/Checkout";
 
-export function BundleCheckout(props: { product: string; priceUsd: number; currencies: ("USDT" | "BTC" | "LTC")[] }) {
+export function BundleCheckout(props: { product: string; priceUsd: number; currencies: Currency[] }) {
   return (
     <Checkout
       {...props}

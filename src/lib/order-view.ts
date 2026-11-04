@@ -19,3 +19,5 @@ export function orderView(o: Order) {
     deliverable: o.status === "paid" ? o.deliverable : null,
   };
 }
+
+export type OrderView = ReturnType<typeof orderView>;

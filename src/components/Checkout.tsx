@@ -2,21 +2,8 @@
 
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-
-type Currency = "USDT" | "BTC" | "LTC";
-
-export type OrderView = {
-  id: string;
-  product: string;
-  currency: Currency;
-  amount: string;
-  minAmount: string;
-  address: string;
-  uri: string;
-  status: "pending" | "paid" | "expired";
-  expiresAt: number;
-  deliverable?: string | null;
-};
+import type { Currency } from "@/lib/chains";
+import type { OrderView } from "@/lib/order-view";
 
 const INFO: Record<Currency, { label: string; network: string; note: string }> = {
   USDT: { label: "USDT", network: "TRON (TRC-20)", note: "Send exactly this amount: it is unique to your order and is how the payment is recognised. Not ERC-20, not BEP-20." },
