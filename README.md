@@ -1,5 +1,7 @@
 # Crypto Checkout
 
+[![build](https://github.com/cpunk7385-sys/crypto-checkout/actions/workflows/build.yml/badge.svg)](https://github.com/cpunk7385-sys/crypto-checkout/actions/workflows/build.yml)
+
 Accept **USDT (TRC-20), Bitcoin and Litecoin** on your own site with no payment processor, no KYC and no private keys on the server. Self-hosted, one Docker container, MIT.
 
 Live demo with a real $1 order: **https://cryptocheckout.duckdns.org/demo**
@@ -11,6 +13,22 @@ Live demo with a real $1 order: **https://cryptocheckout.duckdns.org/demo**
 - **Delivery**: a license key, an expiring download link, a text, or a signed webhook to your own backend. Orders live in SQLite.
 
 Prices are locked at order time from CoinGecko; orders expire after 60 minutes.
+
+## Compared with the alternatives
+
+| | Crypto Checkout | epusdt / BEpusdt | BTCPay Server | Hosted gateways (NOWPayments, CoinGate…) |
+|---|---|---|---|---|
+| Custody | your wallet | your wallet | your wallet | theirs until payout |
+| Merchant account / KYC | none | none | none | account, often KYC |
+| Fees | network only | network only | network only | ~0.5–1% + network |
+| USDT TRC-20 | yes | yes (BEpusdt: also ERC-20, BSC, Polygon, Solana…) | not natively | yes |
+| BTC / LTC | yes, from an xpub, no node | no | yes, needs a node + NBXplorer | yes |
+| Stack | TypeScript / Next.js, embeddable React component | Go binary, Chinese-first docs | C# / .NET, separate server | SaaS |
+| Licence | MIT | GPL-3.0 | MIT | proprietary |
+| Delivery built in | license keys, expiring downloads, text, signed webhooks | webhooks / 易支付 plugins | webhooks, plugins | webhooks |
+| Tests | 66 unit tests in CI | — | extensive | n/a |
+
+Pick BEpusdt if you need many stablecoin networks and are fine with Go and GPL. Pick BTCPay for Lightning or a full Bitcoin merchant stack. Pick this if you want USDT + BTC + LTC inside a Next.js/TypeScript app under MIT, with delivery handled for you.
 
 ## Quick start
 
@@ -63,6 +81,14 @@ Abuse limits built in: 10 orders per IP per 10 minutes, 20 address-tool lookups 
 
 - `/tools/fees`: live comparison of USDT-TRC20 (funded vs fresh address), LTC and BTC transfer fees.
 - `/tools/tron-address`: validate a TRON address, see whether it holds USDT (half the energy fee), poisoning reminder.
+
+## Tests
+
+```bash
+pnpm test        # vitest; all network calls are mocked
+```
+
+Covers address derivation against the BIP84 reference vectors, unique-amount allocation, confirmation and expiry rules, duplicate and late payments, webhook signatures, rate limits and the free tools. CI runs typecheck, lint and tests before building the image.
 
 ## Storefront bundle ($39) and installation ($99)
 
